@@ -84,4 +84,17 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
 
         return route
 
+    def _update(self, *args: Any, **kwargs: Any) -> CALLABLE:
+        async def route(item_id: str, model: self.update_schema) -> SCHEMA:  # type: ignore
+            doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
+            if doc is None:
+                raise NOT_FOUND
+
+            patch_dict = model.dict(exclude_unset=True)
+            for name, value in patch_dict.items():
+                setattr(doc, name, value)
+            return await self.engine.save(doc)
+
+        return route
+
         return route

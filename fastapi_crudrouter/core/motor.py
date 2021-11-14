@@ -72,4 +72,10 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         return route
 
 
+    def _create(self, *args: Any, **kwargs: Any) -> CALLABLE:
+        async def route(model: self.create_schema) -> SCHEMA:  # type: ignore
+            return await self.engine.save(model)
+
+        return route
+
         return route

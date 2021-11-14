@@ -7,7 +7,10 @@ from ._types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
 try:
     from bson import ObjectId
     from motor.motor_asyncio import AsyncIOMotorClient
-    from odmantic import AIOEngine
+    from asyncio import create_task
+    from beanie import init_beanie
+    from beanie.odm.operators.update.general import Set
+
     motor_installed = True
 
 except ImportError:
@@ -21,7 +24,7 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
     def __init__(
         self,
         schema: Type[SCHEMA],
-        engine: Optional[AIOEngine],
+        client: Optional[AsyncIOMotorClient] = None,
         db_url: str = "mongodb://localhost",
         database: str = "db",
         create_schema: Optional[Type[SCHEMA]] = None,
@@ -41,14 +44,24 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             motor_installed
         ), "MotorCRUDRouter requires motor, odmantic, and bson. Please install the required libraries and try again."
         self.schema = schema
-        if engine:
-            self.engine = engine
+        self.create_schema=create_schema
+        self.update_schema=update_schema
+        if client:
+            self.client = client
+            self.database = client.db_name
         else:
             self.db_url = db_url
             self.database = database
             self.client = AsyncIOMotorClient(
                 self.db_url, uuidRepresentation="standard")
-            self.engine = AIOEngine(motor_client=self.client, database=self.database)
+
+        task = create_task(
+            init_beanie(database=self.client.db_name, 
+            document_models = [
+                self.schema,
+                self.create_schema,
+                self.update_schema,
+        ]))
         
         super().__init__(
             schema=schema,
@@ -73,57 +86,48 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             skip, limit = pagination.get("skip"), pagination.get("limit")
             skip = cast(int, skip)
             limit = limit or 100
-            docs = await self.engine.find(self.schema, {}, skip=skip, limit=limit)
-            if not docs:
-                raise NOT_FOUND
-            return docs
+            return await self.schema.find().skip(skip).to_list(limit)
 
         return route
 
     def _get_one(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(item_id: str) -> SCHEMA:
-            doc = await self.engine.find_one(self.schema, {"_id": ObjectId(item_id)})
+            doc = await self.schema.get(item_id)
             if not doc:
                 raise NOT_FOUND
             return doc
+            
         
         return route
 
     def _create(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(model: self.create_schema) -> SCHEMA:  # type: ignore
-            doc = await self.engine.save(model)
-            if not doc:
-                raise NOT_FOUND
-            return doc
+            return await model.create()
 
         return route
 
     def _update(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(item_id: str, model: self.update_schema) -> SCHEMA:  # type: ignore
-            doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
+            doc = await self.schema.get(item_id)
             if not doc:
                 raise NOT_FOUND
-            patch_dict = model.dict(exclude_unset=True)
-            for name, value in patch_dict.items():
-                setattr(doc, name, value)
-            return await self.engine.save(doc)
+            del model.id
+            return await doc.update(Set(model))
 
         return route
 
     def _delete_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         async def route() -> List[SCHEMA]:
-            docs = await self.engine.find(self.schema, {})
-            for doc in docs:
-                await self.engine.delete(doc)
+            return await self.schema.find().delete()
 
         return route
 
     def _delete_one(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(item_id: str) -> SCHEMA:
-            doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
+            doc = await self.schema.get(item_id)
             if not doc:
                 raise NOT_FOUND
-            return await self.engine.delete(doc)
+            return await doc.delete()
 
         return route
 

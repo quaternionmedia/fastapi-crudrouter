@@ -21,9 +21,9 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
     def __init__(
         self,
         schema: Type[SCHEMA],
+        engine: Optional[AIOEngine],
         db_url: str = "mongodb://localhost",
         database: str = "db",
-        collection: str = "collection",
         create_schema: Optional[Type[SCHEMA]] = None,
         update_schema: Optional[Type[SCHEMA]] = None,
         prefix: Optional[str] = None,
@@ -41,14 +41,14 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             motor_installed
         ), "MotorCRUDRouter requires motor, odmantic, and bson. Please install the required libraries and try again."
         self.schema = schema
-        self.db_url = db_url
-        self.database = database
-        self.collection = collection
-        self.client = AsyncIOMotorClient(
-            self.db_url, uuidRepresentation="standard"
-        )
-        self.engine = AIOEngine(motor_client=self.client, database=self.database)
-        self.db = self.client[self.database]
+        if engine:
+            self.engine = engine
+        else:
+            self.db_url = db_url
+            self.database = database
+            self.client = AsyncIOMotorClient(
+                self.db_url, uuidRepresentation="standard")
+            self.engine = AIOEngine(motor_client=self.client, database=self.database)
         
         super().__init__(
             schema=schema,

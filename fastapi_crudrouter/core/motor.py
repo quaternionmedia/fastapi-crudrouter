@@ -3,6 +3,8 @@ from typing import Any, Callable, List, Type, cast, Optional, Union
 from . import CRUDGenerator, NOT_FOUND
 from ._types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
 
+from bson import ObjectId
+
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
     from odmantic import AIOEngine
@@ -71,6 +73,10 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             return await self.engine.find(self.schema, {}, skip=skip, limit=limit)
         return route
 
+    def _get_one(self, *args: Any, **kwargs: Any) -> CALLABLE:
+        async def route(item_id: str) -> SCHEMA:
+            return await self.engine.find_one(self.schema, {"_id": ObjectId(item_id)})
+        return route
 
     def _create(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(model: self.create_schema) -> SCHEMA:  # type: ignore

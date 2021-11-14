@@ -104,3 +104,12 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
                 await self.engine.delete(doc)
 
         return route
+
+    def _delete_one(self, *args: Any, **kwargs: Any) -> CALLABLE:
+        async def route(item_id: str) -> SCHEMA:
+            doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
+            if not doc:
+                raise NOT_FOUND
+            return await self.engine.delete(doc)
+
+        return route

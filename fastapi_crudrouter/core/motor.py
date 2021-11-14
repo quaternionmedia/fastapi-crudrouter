@@ -87,7 +87,7 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
     def _update(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(item_id: str, model: self.update_schema) -> SCHEMA:  # type: ignore
             doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
-            if doc is None:
+            if not doc:
                 raise NOT_FOUND
 
             patch_dict = model.dict(exclude_unset=True)
@@ -96,5 +96,11 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             return await self.engine.save(doc)
 
         return route
+
+    def _delete_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
+        async def route() -> List[SCHEMA]:
+            docs = await self.engine.find(self.schema, {})
+            for doc in docs:
+                await self.engine.delete(doc)
 
         return route

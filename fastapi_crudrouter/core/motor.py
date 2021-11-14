@@ -5,11 +5,10 @@ from ._types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
 
 try:
     from motor.motor_asyncio import AsyncIOMotorClient
+    from odmantic import AIOEngine
     motor_installed = True
-    NoMatch = None  # type: ignore
 
 except ImportError:
-    NoMatch = None  # type: ignore
     motor_installed = False
 
 CALLABLE = Callable[..., SCHEMA]
@@ -36,12 +35,14 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         delete_all_route: Union[bool, DEPENDENCIES] = True,
         **kwargs: Any
     ) -> None:
+        self.schema = schema
         self.db_url = db_url
         self.database = database
         self.collection = collection
         self.client = AsyncIOMotorClient(
             self.db_url, uuidRepresentation="standard"
         )
+        self.engine = AIOEngine(motor_client=self.client, database=self.database)
         self.db = self.client[self.database]
 
         super().__init__(
@@ -67,7 +68,8 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             skip, limit = pagination.get("skip"), pagination.get("limit")
             skip = cast(int, skip)
             limit = limit or 100
+            return await self.engine.find(self.schema, {}, skip=skip, limit=limit)
+        return route
 
-            return await self.db[self.collection].find({}).skip(skip).limit(limit).to_list(length = limit)
 
         return route

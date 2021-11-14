@@ -46,7 +46,7 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         )
         self.engine = AIOEngine(motor_client=self.client, database=self.database)
         self.db = self.client[self.database]
-
+        
         super().__init__(
             schema=schema,
             create_schema=create_schema,
@@ -64,23 +64,34 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         )
 
         self.models: List[SCHEMA] = []
-
+        
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         async def route(pagination: PAGINATION = self.pagination) -> List[SCHEMA]:
             skip, limit = pagination.get("skip"), pagination.get("limit")
             skip = cast(int, skip)
             limit = limit or 100
-            return await self.engine.find(self.schema, {}, skip=skip, limit=limit)
+            docs = await self.engine.find(self.schema, {}, skip=skip, limit=limit)
+            if not docs:
+                raise NOT_FOUND
+            return docs
+
         return route
 
     def _get_one(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(item_id: str) -> SCHEMA:
-            return await self.engine.find_one(self.schema, {"_id": ObjectId(item_id)})
+            doc = await self.engine.find_one(self.schema, {"_id": ObjectId(item_id)})
+            if not doc:
+                raise NOT_FOUND
+            return doc
+        
         return route
 
     def _create(self, *args: Any, **kwargs: Any) -> CALLABLE:
         async def route(model: self.create_schema) -> SCHEMA:  # type: ignore
-            return await self.engine.save(model)
+            doc = await self.engine.save(model)
+            if not doc:
+                raise NOT_FOUND
+            return doc
 
         return route
 
@@ -89,7 +100,6 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             doc = await self.engine.find_one(self.schema, self.schema.id == ObjectId(item_id))
             if not doc:
                 raise NOT_FOUND
-
             patch_dict = model.dict(exclude_unset=True)
             for name, value in patch_dict.items():
                 setattr(doc, name, value)
@@ -113,3 +123,4 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             return await self.engine.delete(doc)
 
         return route
+

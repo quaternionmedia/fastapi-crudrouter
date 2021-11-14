@@ -3,9 +3,9 @@ from typing import Any, Callable, List, Type, cast, Optional, Union
 from . import CRUDGenerator, NOT_FOUND
 from ._types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
 
-from bson import ObjectId
 
 try:
+    from bson import ObjectId
     from motor.motor_asyncio import AsyncIOMotorClient
     from odmantic import AIOEngine
     motor_installed = True
@@ -37,6 +37,9 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         delete_all_route: Union[bool, DEPENDENCIES] = True,
         **kwargs: Any
     ) -> None:
+        assert (
+            motor_installed
+        ), "MotorCRUDRouter requires motor, odmantic, and bson. Please install the required libraries and try again."
         self.schema = schema
         self.db_url = db_url
         self.database = database

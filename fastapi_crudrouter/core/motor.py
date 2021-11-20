@@ -42,21 +42,20 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
     ) -> None:
         assert (
             motor_installed
-        ), "MotorCRUDRouter requires motor, odmantic, and bson. Please install the required libraries and try again."
+        ), "MotorCRUDRouter requires motor, beanie, and bson. Please install the required libraries and try again."
         self.schema = schema
         self.create_schema=create_schema
         self.update_schema=update_schema
         if client:
             self.client = client
-            self.database = client.db_name
         else:
             self.db_url = db_url
-            self.database = database
             self.client = AsyncIOMotorClient(
                 self.db_url, uuidRepresentation="standard")
 
+        self.db = self.client[database]
         task = create_task(
-            init_beanie(database=self.client.db_name, 
+            init_beanie(database=self.db,
             document_models = [
                 self.schema,
                 self.create_schema,

@@ -5,10 +5,7 @@ from ._types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
 
 
 try:
-    from bson import ObjectId
     from motor.motor_asyncio import AsyncIOMotorClient
-    from asyncio import create_task
-    from beanie import init_beanie
     from beanie.odm.operators.update.general import Set
 
     motor_installed = True
@@ -44,24 +41,16 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             motor_installed
         ), "MotorCRUDRouter requires motor, beanie, and bson. Please install the required libraries and try again."
         self.schema = schema
-        self.create_schema=create_schema
-        self.update_schema=update_schema
+        self.create_schema = create_schema
+        self.update_schema = update_schema
         if client:
             self.client = client
         else:
             self.db_url = db_url
-            self.client = AsyncIOMotorClient(
-                self.db_url, uuidRepresentation="standard")
+            self.client = AsyncIOMotorClient(self.db_url, uuidRepresentation="standard")
 
         self.db = self.client[database]
-        task = create_task(
-            init_beanie(database=self.db,
-            document_models = [
-                self.schema,
-                self.create_schema,
-                self.update_schema,
-        ]))
-        
+
         super().__init__(
             schema=schema,
             create_schema=create_schema,
@@ -79,7 +68,7 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
         )
 
         self.models: List[SCHEMA] = []
-        
+
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         async def route(pagination: PAGINATION = self.pagination) -> List[SCHEMA]:
             skip, limit = pagination.get("skip"), pagination.get("limit")
@@ -95,8 +84,7 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             if not doc:
                 raise NOT_FOUND
             return doc
-            
-        
+
         return route
 
     def _create(self, *args: Any, **kwargs: Any) -> CALLABLE:
@@ -129,4 +117,3 @@ class MotorCRUDRouter(CRUDGenerator[SCHEMA]):
             return await doc.delete()
 
         return route
-
